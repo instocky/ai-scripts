@@ -4,6 +4,7 @@ pydantic>=2.7
 python-dotenv
 
 logfire
+openlit
 
 rich
 typer

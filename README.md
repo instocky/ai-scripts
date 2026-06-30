@@ -48,7 +48,8 @@ python scripts\<script_name>.py
 | --- | --------------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------- |
 | 1   | `scripts/get_user.py`       | [Instructor](https://pypi.org/project/instructor/)                                                          | Базовый сценарий: Instructor извлекает `User(name, age, city)` из одного предложения                         | [docs/get_user.md](docs/get_user.md)           |
 | 2   | `scripts/parse_issue.py`    | [Instructor](https://pypi.org/project/instructor/)                                                          | Enum + вложенная модель + список + валидация + retries на малой модели                                       | [docs/parse_issue.md](docs/parse_issue.md)     |
-| 3   | `scripts/logfire_pipeline.py` | [Logfire](https://pydantic.dev/logfire) + [OpenRouter](https://openrouter.ai/) через OpenAI SDK + Instructor | Сквозной pipeline с трассировкой: HTTP → Pydantic → lookup → LLM ×2. Локальный SQLite, без облака              | [docs/logfire_pipeline.md](docs/logfire_pipeline.md) |
+| 3   | `scripts/logfire_pipeline.py` | [Logfire](https://pydantic.dev/logfire) + [OpenRouter](https://openrouter.ai/) через OpenAI SDK + Instructor | Сквозной pipeline с трассировкой Logfire (legacy reference для сравнения подходов)                            | [docs/logfire_pipeline.md](docs/logfire_pipeline.md) |
+| 4   | `scripts/openlit_pipeline.py` | [OpenLIT](https://github.com/openlit/openlit) + OTel + [Phoenix](https://github.com/Arize-ai/phoenix) (опц.) | Сквозной pipeline через OpenTelemetry: HTTP → Pydantic → lookup → LLM ×2. Backend pluggable (stdout → Phoenix → SigNoz) | [docs/openlit_pipeline.md](docs/openlit_pipeline.md) |
 
 ---
 

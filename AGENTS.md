@@ -63,21 +63,27 @@ pytest tests\test_article_generator_step2_service.py -q
 
 ### Observability
 
-- Для трассировки pipeline'ов использовать [Logfire](https://pydantic.dev/logfire).
-- В Logfire 4.x режим вывода задаётся через `send_to_logfire`:
-  - `"if-token-present"` (дефолт) — без токена только stdout (Rich-формат), с токеном — Logfire Cloud;
-  - `False` — только stdout, всегда;
-  - `True` — всегда в облако (упадёт без токена).
-- Локального web-UI в Logfire 4.x **нет** (команда `logfire web` отсутствует). Для UI реальные варианты:
-  - `uv run logfire auth` или `logfire auth` (без `login`! — это не подкоманда, `logfire auth --help` врёт и показывает только `logout`) → Logfire Cloud free tier (https://logfire.pydantic.dev);
-  - OTLP-бэкенд (SigNoz, Jaeger, Honeycomb) через `OTEL_EXPORTER_OTLP_ENDPOINT`;
-  - прямое задание `LOGFIRE_TOKEN` через env (если токен уже есть).
-- ⚠️ После `logfire auth` проект **не создаётся автоматически**. Первый запуск pipeline упадёт молча (stdout работает, cloud — нет). Обязательно: `logfire projects new <name>`.
-- ⚠️ `--region` и `--base-url` — ГЛОБАЛЬНЫЕ флаги (перед подкомандой: `logfire --region us auth`, не `logfire auth --region us`).
-- Авто-инструментация предпочтительна: `logfire.instrument_openai()`, `logfire.instrument_pydantic()` и т.д.
-- Для кастомных шагов — `with logfire.span("name", **attrs)`.
-- Не передавать секреты (API-ключи, токены, пароли) в атрибуты span и `logfire.info(...)`. Pydantic-модели с такими полями маскировать через `logfire.obfuscate`.
-- Если проект уже использует Langfuse — это другой инструмент, не дублировать; для MVP выбирать один.
+- Для трассировки LLM-pipeline'ов использовать **OpenTelemetry через [OpenLIT](https://github.com/openlit/openlit)**.
+- Архитектурный принцип: **OpenTelemetry = контракт, backend = pluggable**. Код не должен зависеть от конкретного бэкенда — выбор через env-переменные.
+- Поддерживаемые backend'ы (выбираются через `OTEL_EXPORTER_OTLP_ENDPOINT`):
+  - **stdout** (default, без env) — `ConsoleSpanExporter`, JSON в stdout. Для dev и CI.
+  - **Phoenix** (`phoenix serve` → `http://localhost:6006`) — локальный UI, SQLite-режим. Установить отдельно: `pip install arize-phoenix`.
+  - **SigNoz / Jaeger / Tempo / Honeycomb** — full APM, Docker.
+  - Logfire Cloud как escape hatch через OTLP (`OTEL_EXPORTER_OTLP_ENDPOINT=https://logfire-us.pydantic.dev`) — **не рекомендуется** для MVP.
+- Инициализация:
+  ```python
+  import openlit
+  openlit.init(
+      otlp_endpoint=os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
+      pricing_json=os.getenv("OPENLIT_PRICING_JSON") or "pricing.json",  # см. ниже
+  )
+  ```
+  OpenLIT в `init()` auto-instruments: OpenAI, Anthropic, Cohere, Mistral, Ollama, vLLM, Bedrock, VertexAI, LangChain, LlamaIndex, Haystack, Pydantic, urllib, httpx. Включает встроенные price-таблицы для популярных моделей — но **для моделей с date-suffix (OpenRouter) и кастомных моделей lookup возвращает 0**, нужен свой `pricing.json`.
+- **Custom pricing.json** — файл в корне проекта (override через `OPENLIT_PRICING_JSON`). Формат: top-level категории (`chat`, `embeddings`, etc.), внутри `chat` — `{model_name: {promptPrice, completionPrice}}` в **USD за 1K токенов** (не за 1M). Источник цен: <https://openrouter.ai/models/<model>>. Без файла `gen_ai.usage.cost` будет `0` для моделей вне встроенной таблицы.
+- Авто-инструментация предпочтительна. Manual spans — только для бизнес-логики (in-memory lookups, etc.), не для HTTP/SQL/LLM. Auto-instrumented `urllib`/`httpx` span'ы дают HTTP-метрики; ручные span'ы рядом — для доменного контекста (URL, user_id, custom events).
+- Для custom-шагов: `from opentelemetry import trace; tracer = trace.get_tracer(__name__); with tracer.start_as_current_span("name", attributes={...}) as span: span.add_event("event", attributes={...})`.
+- **Не передавать секреты** (API-ключи, токены, пароли) в атрибуты span и `add_event()`. Pydantic-модели с такими полями маскировать (например, не класть весь `User` в атрибуты — только `user_id`).
+- Если проект уже использует Langfuse или другой инструмент — это другой инструмент, не дублировать; для MVP выбирать один стек.
 
 ### Контракты
 

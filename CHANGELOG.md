@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-06-30
+
+### Added
+
+- `scripts/openlit_pipeline.py` — сквозной pipeline с трассировкой через OpenLIT + OpenTelemetry. Тот же сценарий (HTTP → Pydantic → lookup → LLM ×2), но без workaround'ов из Logfire-версии: нет `MODEL_PRICING`, нет `annotate_cost`, нет `llm_call()` helper'а, нет ручных Chat Completion span'ов.
+- `pricing.json` — кастомный файл с ценами на используемые OpenRouter-модели (`z-ai/glm-5.2`, `openai/gpt-4o-mini`). Подключается через `openlit.init(pricing_json=...)` или env `OPENLIT_PRICING_JSON`. Формат: USD за 1K токенов.
+- `docs/openlit_pipeline.md` — детальная документация нового скрипта, архитектурного паттерна «OTel = контракт, backend = pluggable» и формата `pricing.json`.
+- `openlit` — добавлен в `requirements.txt`. `arize-phoenix` намеренно НЕ добавлен (Phoenix — это backend, поднимается отдельно).
+
+### Changed
+
+- `AGENTS.md` — раздел «Observability» полностью переписан под OpenTelemetry: вместо Logfire-специфичных инструкций — общий принцип «OTel = контракт, backend = pluggable», список поддерживаемых backend'ов (stdout / Phoenix / SigNoz), правила auto-instrumentation и manual spans для бизнес-логики, инструкция по `pricing.json`.
+- `README.md` — добавлена строка #4 в tools-table (`scripts/openlit_pipeline.py`); строка #3 (`logfire_pipeline.py`) помечена как legacy reference для сравнения подходов.
+
+### Fixed
+
+- **Cost-калькуляция для OpenRouter date-suffix моделей.** Эмпирически подтверждено: встроенная price-таблица OpenLIT не покрывает маршруты с date-suffix (например `z-ai/glm-5.2-20260616`), и `gen_ai.usage.cost` для таких моделей приходит как `0` — та же проблема, что была у Logfire + `genai_prices`. Решено через `pricing_json` (вместо ручного `MODEL_PRICING`/`annotate_cost` как в Logfire-версии) — OpenLIT берёт цены из нашего JSON, без workaround-кода в pipeline'е.
+- **Корректировка документации:** убрано утверждение «OpenLIT знает цены из коробки» (для date-suffix OpenRouter не работает), исправлено утверждение «urllib не auto-instruments» (OpenLIT тянет `opentelemetry-instrumentation-urllib` как зависимость).
+
+### Notes
+
+- `scripts/logfire_pipeline.py` и `docs/logfire_pipeline.md` оставлены без изменений — служат legacy reference для сравнения двух подходов (Logfire auto-instrument workaround vs OpenLIT out-of-the-box).
+- Дефолтный backend для MVP — `stdout` (ConsoleSpanExporter). Phoenix подключается опционально через `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:6006` после `phoenix serve`. SigNoz и Live Monitoring перенесены в BACKLOG.
+- **Известные ограничения** (полный список — в `docs/openlit_pipeline.md` → «Известные ограничения»): (1) cost = 0 для моделей вне `pricing.json`; (2) ручной `fetch_external_user` span дублирует auto-instrumented urllib (сосуществуют нормально); (3) ConsoleSpanExporter дублирует вывод в Phoenix-режиме (шум, легко отключается).
+
 ## [0.2.0] - 2026-06-30
 
 ### Honest reassessment: Logfire не подошёл для MVP-сценария
@@ -19,6 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Итого: тот же operational overhead, от которого уходили от Langfuse (ClickHouse-стек), просто в другой обёртке.
 
 **Решение:** скрипт остаётся как есть (работающий cloud-демо + stdout fallback), но **не рекомендуется как primary-решение для MVP**. Для MVP-проектов лучше:
+
 - structured `logging` в JSON (stdlib, без зависимостей);
 - `phoenix serve` от Arize (open source, SQLite-режим, локальный UI);
 - полноценный OTLP → SigNoz (если хочется web UI локально и есть Docker).

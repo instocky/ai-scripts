@@ -1,0 +1,16 @@
+{
+    "chat": {
+        "z-ai/glm-5.2": {
+            "promptPrice": 0.00094,
+            "completionPrice": 0.003
+        },
+        "z-ai/glm-5.2-20260616": {
+            "promptPrice": 0.00094,
+            "completionPrice": 0.003
+        },
+        "openai/gpt-4o-mini": {
+            "promptPrice": 0.00015,
+            "completionPrice": 0.0006
+        }
+    }
+}

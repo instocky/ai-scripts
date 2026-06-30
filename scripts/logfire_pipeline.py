@@ -31,7 +31,6 @@ import os
 import urllib.request
 from typing import Literal
 
-import instructor
 import logfire
 from dotenv import load_dotenv
 from openai import OpenAI

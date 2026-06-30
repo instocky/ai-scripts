@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Виртуальное окружение
+venv/
+env/
+
+# Переменные окружения
+.env
+
+# База данных
+app/data/
+
+# Логи
+logs/
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Uvicorn / pytest
+.pytest_cache/
+htmlcov/
+.coverage
+
+# User
+notes.md
+project_context.txt
+collect_context.py
+tmp/
+tree_app.py
+.ruff_cache
+db_report.md
+commits*.txt
+report*.md
+settings*.json
+*.db
+graceful-matter-298207-a61df8962a19.json
+
+# Ingestion smoke-test outputs (step1)
+out/
+
+# Step1 corpus: generated locally via scripts/generate_test_corpus.py
+tests/data/

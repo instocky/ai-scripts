@@ -3,5 +3,7 @@ openai>=1.50.0
 pydantic>=2.7
 python-dotenv
 
+logfire
+
 rich
 typer

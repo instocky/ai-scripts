@@ -53,3 +53,6 @@ out/
 
 # Step1 corpus: generated locally via scripts/generate_test_corpus.py
 tests/data/
+
+# Logfire local observability data (SQLite, UI cache)
+.logfire/

@@ -91,9 +91,9 @@ if _pricing_json_path.exists():
         # Аргумент pricing_json игнорируем — у нас уже загруженный dict.
         return _custom_pricing_dict
 
-    # Патчим в обоих namespace (openlit/__init__.py импортирует функцию через
-    # `from openlit.__helpers import fetch_pricing_info` — локальный binding).
-    import openlit
+    # Патчим через binding в openlit (openlit/__init__.py импортирует функцию
+    # через `from openlit.__helpers import fetch_pricing_info` — локальный
+    # binding; модуль openlit уже импортирован выше, см. строку 41).
     openlit.fetch_pricing_info = _patched_fetch_pricing_info
     print(
         f"[openlit] custom pricing loaded from {_pricing_json_path}: "
@@ -110,12 +110,13 @@ openlit.init(
     pricing_json=None,  # ignored by patched fetch_pricing_info
 )
 
-# ConsoleSpanExporter — для stdout-режима (полезно и для дев, и для CI).
-# В Phoenix-режиме работает параллельно с OTLP — вывод будет двойной,
-# но это приемлемо для MVP.
+# ConsoleSpanExporter — только для stdout-режима (без OTEL_EXPORTER_OTLP_ENDPOINT).
+# В Phoenix/OTLP-режиме Console лишний: каждый span уйдёт и в stdout, и в коллектор.
 _provider = trace.get_tracer_provider()
 _real_provider = getattr(_provider, "_real_provider", _provider) or _provider
-if hasattr(_real_provider, "add_span_processor"):
+if hasattr(_real_provider, "add_span_processor") and not os.getenv(
+    "OTEL_EXPORTER_OTLP_ENDPOINT"
+):
     _real_provider.add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
 
 tracer = trace.get_tracer(__name__)

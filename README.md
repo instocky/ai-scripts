@@ -48,8 +48,47 @@ python scripts\<script_name>.py
 | --- | --------------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------- |
 | 1   | `scripts/get_user.py`       | [Instructor](https://pypi.org/project/instructor/)                                                          | Базовый сценарий: Instructor извлекает `User(name, age, city)` из одного предложения                         | [docs/get_user.md](docs/get_user.md)           |
 | 2   | `scripts/parse_issue.py`    | [Instructor](https://pypi.org/project/instructor/)                                                          | Enum + вложенная модель + список + валидация + retries на малой модели                                       | [docs/parse_issue.md](docs/parse_issue.md)     |
-| 3   | `scripts/logfire_pipeline.py` | [Logfire](https://pydantic.dev/logfire) + [OpenRouter](https://openrouter.ai/) через OpenAI SDK + Instructor | Сквозной pipeline с трассировкой Logfire (legacy reference для сравнения подходов)                            | [docs/logfire_pipeline.md](docs/logfire_pipeline.md) |
-| 4   | `scripts/openlit_pipeline.py` | [OpenLIT](https://github.com/openlit/openlit) + OTel + [Phoenix](https://github.com/Arize-ai/phoenix) (опц.) | Сквозной pipeline через OpenTelemetry: HTTP → Pydantic → lookup → LLM ×2. Backend pluggable (stdout → Phoenix → SigNoz) | [docs/openlit_pipeline.md](docs/openlit_pipeline.md) |
+| 3   | `scripts/simple_pipeline.py` | [OpenLIT](https://github.com/openlit/openlit) + OTel → SQLite                                              | Минимальный pipeline (HTTP + compute + lookup) для smoke-теста трейсера. Без LLM, без API-ключей             | —                                              |
+| 4   | `scripts/openlit_pipeline.py` | [OpenLIT](https://github.com/openlit/openlit) + OTel → SQLite (+ OTLP escape hatch)                      | Сквозной pipeline через OpenTelemetry: HTTP → Pydantic → lookup → LLM ×2. Трейсы — в SQLite                  | [docs/openlit_pipeline.md](docs/openlit_pipeline.md) |
+| 5   | `scripts/view_traces.py`    | CLI viewer для `src/tracing/`                                                                              | `python scripts\view_traces.py --last 24h --limit 20` — таблица trace'ов; `--by-span` — дерево span'ов        | —                                              |
+
+---
+
+## Tracing
+
+Сквозная аналитика для любого скрипта через единый сервис `src/tracing/`.
+
+**В скрипте (3 строки):**
+
+```python
+from tracing import init_tracing, get_tracer, finish_tracing
+
+init_tracing(service_name=__name__, db_path="traces.db")
+tracer = get_tracer(__name__)
+# ... ручные span'ы и/или auto-instrumentation OpenLIT ...
+finish_tracing()  # в конце __main__
+```
+
+**Просмотр (CLI):**
+
+```powershell
+python scripts\view_traces.py --last 24h --limit 20
+python scripts\view_traces.py --by-span --service openlit_pipeline --last 24h
+python scripts\view_traces.py --service simple_pipeline --last 1h --by-span
+python scripts\view_traces.py --trace f90823cc...   # конкретный trace
+```
+
+**Что в SQLite (`<root>/traces.db`):**
+
+- `traces` — по одной строке на каждый pipeline run: `service`, `started_at`, `duration_ms`, `total_cost_usd`, `status` (OK/ERROR), плюс `raw_spans_json` со всеми span'ами для ad-hoc.
+- `idx_traces_service_started` — для быстрой фильтрации по сервису и времени.
+
+**Переменные окружения:**
+
+- `TRACING_DB_PATH` — путь к SQLite (default: `<root>/traces.db`).
+- `OTEL_EXPORTER_OTLP_ENDPOINT` — если задан, OpenLIT параллельно шлёт OTLP в этот endpoint (Phoenix / SigNoz) в дополнение к SQLite.
+- `OTEL_TRACES_EXPORTER` / `OTEL_METRICS_EXPORTER` / `OTEL_LOGS_EXPORTER` — по умолчанию `init_tracing()` ставит `none` (отключает OpenLIT Console*-фоллбэк). Для своего Phoenix-сценария выставите `otlp`.
+- `OPENLIT_PRICING_JSON` — путь к кастомному pricing (для date-suffix OpenRouter-моделей).
 
 ---
 

@@ -1,6 +1,6 @@
 # scripts/openlit_pipeline.py
 #
-# Сквозной pipeline с трассировкой через OpenLIT + OpenTelemetry.
+# Сквозной pipeline с трассировкой через OpenLIT + OpenTelemetry → SQLite.
 #
 # Демонстрирует:
 #   - HTTP-запрос наружу (urllib, stdlib) — ручной span
@@ -10,7 +10,7 @@
 #   - LLM-вызов #2 — auto + manual span
 #   - корневой span связывает все шаги в один trace
 #
-# Дерево в Phoenix UI (или в stdout-формате от ConsoleSpanExporter):
+# Дерево span'ов (см. `python -m tracing --by-span`):
 #   handle_user_request
 #     ├── fetch_external_user        (manual OTel span)
 #     ├── model_validate             (auto, от OpenLIT)
@@ -23,103 +23,42 @@
 #
 # Запуск:
 #   python scripts\openlit_pipeline.py
-#     → stdout (default, ConsoleSpanExporter).
+#     → пишет в traces.db (env TRACING_DB_PATH или <root>/traces.db).
 #
-#   С Phoenix (опционально):
+#   С Phoenix (опционально, OTLP в обход SQLite):
 #     phoenix serve
 #     $env:OTEL_EXPORTER_OTLP_ENDPOINT = "http://localhost:6006"
 #     python scripts\openlit_pipeline.py
-#     → http://localhost:6006
+#
+#   Просмотр:
+#     python -m tracing --service openlit_pipeline --last 7d --limit 20
+#     python -m tracing --by-span --last 24h
 
 import json
 import os
+import sys
 import urllib.request
 from pathlib import Path
 from typing import Literal
 
-import instructor
-import openlit
-from dotenv import load_dotenv
-from openai import OpenAI
-from opentelemetry import trace
-from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
-from pydantic import BaseModel, Field
+# Bootstrap sys.path — корень проекта содержит src/
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(_PROJECT_ROOT / "src"))
+
+import instructor  # noqa: E402
+from dotenv import load_dotenv  # noqa: E402
+from openai import OpenAI  # noqa: E402
+from pydantic import BaseModel, Field  # noqa: E402
+
+from tracing import default_db_path, finish_tracing, get_tracer, init_tracing  # noqa: E402
 
 
 load_dotenv()
-
-
-# =====================================================
-# 1. OpenLIT + OpenTelemetry init
-# =====================================================
-#
-# Режимы:
-#   - default (без OTEL_EXPORTER_OTLP_ENDPOINT):
-#       OpenLIT ставит no-op OTLP, мы добавляем ConsoleSpanExporter
-#       → трейсы идут в stdout (JSON через OTel SDK).
-#   - OTEL_EXPORTER_OTLP_ENDPOINT=http://... :
-#       OpenLIT ставит OTLP HTTP exporter на этот endpoint
-#       → Phoenix UI / SigNoz / Logfire Cloud (escape hatch).
-#
-# Phoenix setup:
-#   phoenix serve
-#   $env:OTEL_EXPORTER_OTLP_ENDPOINT = "http://localhost:6006"
-#   python scripts\openlit_pipeline.py
-
-# Custom pricing: OpenLIT поставляет pricing.json с ценами на популярные модели
-# (OpenAI, Anthropic, часть OpenRouter), но для моделей с date-suffix (например
-# z-ai/glm-5.2-20260616) lookup возвращает 0 — нужно подсунуть свой JSON.
-# Формат: {category: {model_name: {promptPrice, completionPrice}}} в USD за 1K токенов.
-# Override через env OPENLIT_PRICING_JSON (URL или file path).
-#
-# ⚠️ ВАЖНО: на Windows НИ ОДИН path/URL формат не работает через параметр
-# `pricing_json=` из-за бага в OpenLIT 1.42.1 (см. memory: pricing-on-windows).
-# Краткая суть: `fetch_pricing_info()` использует `urlparse(path).scheme != ""`
-# для определения URL-это или путь. На Windows `urlparse("C:\...").scheme == "c"`
-# (драйв = scheme), и `requests.get("c:...")` молча падает → pricing_info = {}.
-# То же с `file:///C:/...` — `requests` не умеет `file://` без requests-file.
-# Поэтому читаем файл сами и monkey-patch'им `openlit.fetch_pricing_info` —
-# он импортируется как имя в openlit.__init__, патч этого имени перехватывает
-# вызов из `init()`.
-_PRICING_JSON_DEFAULT = Path(__file__).resolve().parent.parent / "pricing.json"
-_pricing_json_path = Path(os.getenv("OPENLIT_PRICING_JSON") or _PRICING_JSON_DEFAULT)
-if _pricing_json_path.exists():
-    with open(_pricing_json_path, encoding="utf-8") as f:
-        _custom_pricing_dict = json.load(f)
-
-    def _patched_fetch_pricing_info(pricing_json=None):  # noqa: ARG001
-        # Аргумент pricing_json игнорируем — у нас уже загруженный dict.
-        return _custom_pricing_dict
-
-    # Патчим через binding в openlit (openlit/__init__.py импортирует функцию
-    # через `from openlit.__helpers import fetch_pricing_info` — локальный
-    # binding; модуль openlit уже импортирован выше, см. строку 41).
-    openlit.fetch_pricing_info = _patched_fetch_pricing_info
-    print(
-        f"[openlit] custom pricing loaded from {_pricing_json_path}: "
-        f"{len(_custom_pricing_dict.get('chat', {}))} chat models",
-    )
-else:
-    print(
-        f"[openlit] WARNING: pricing_json not found at {_pricing_json_path}, "
-        "using built-in defaults. cost for unknown models will be 0.",
-    )
-
-openlit.init(
-    otlp_endpoint=os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT"),
-    pricing_json=None,  # ignored by patched fetch_pricing_info
+init_tracing(
+    service_name=Path(__file__).stem,
+    db_path=default_db_path(),
 )
-
-# ConsoleSpanExporter — только для stdout-режима (без OTEL_EXPORTER_OTLP_ENDPOINT).
-# В Phoenix/OTLP-режиме Console лишний: каждый span уйдёт и в stdout, и в коллектор.
-_provider = trace.get_tracer_provider()
-_real_provider = getattr(_provider, "_real_provider", _provider) or _provider
-if hasattr(_real_provider, "add_span_processor") and not os.getenv(
-    "OTEL_EXPORTER_OTLP_ENDPOINT"
-):
-    _real_provider.add_span_processor(BatchSpanProcessor(ConsoleSpanExporter()))
-
-tracer = trace.get_tracer(__name__)
+tracer = get_tracer(__name__)
 
 
 # =====================================================
@@ -329,26 +268,15 @@ if __name__ == "__main__":
             "    (HTTP, Pydantic, lookup) уже будут видны в трейсе."
         )
 
-    print("=" * 70)
-    print("PIPELINE START")
-    print("=" * 70)
-
     try:
-        result = run_pipeline(
+        run_pipeline(
             user_id=1,
             query="Tell me about Leanne's account tier and region.",
         )
-        print("\n" + "=" * 70)
-        print("RESULT")
-        print("=" * 70)
-        print(json.dumps(result.model_dump(), indent=2, ensure_ascii=False))
     except Exception as e:
-        print(f"\n[!] Pipeline failed: {type(e).__name__}: {e}")
-
-    print("\n" + "=" * 70)
-    print("DONE")
-    print("=" * 70)
-    print("Трейсы:")
-    print("  • default — выше в stdout (ConsoleSpanExporter);")
-    print("  • Phoenix — phoenix serve + $env:OTEL_EXPORTER_OTLP_ENDPOINT='http://localhost:6006'")
-    print("  • UI: http://localhost:6006")
+        # Trace со status=ERROR всё равно запишется (если root span не закрыт
+        # до исключения). Сюда — только краткое уведомление в stderr.
+        print(f"[pipeline] failed: {type(e).__name__}: {e}", file=sys.stderr)
+    finally:
+        # Сбросить BSP — иначе последние span'ы могут не успеть в SQLite.
+        finish_tracing()

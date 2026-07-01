@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-01
+
+### Added
+
+- `src/tracing/` — сервис сквозной аналитики: `init_tracing()` подключает OpenLIT + OpenTelemetry SDK, регистрирует `SqliteSpanExporter` (единственный span-exporter), печатает компактный stdout-итог через `finish_tracing()`. Схема SQLite: `traces` с денормализованными колонками для фильтрации (`service / started_at / duration_ms / total_cost_usd / status`) + один блоб `raw_spans_json` со всеми span'ами trace'а для ad-hoc/SQL-извлечений.
+- `src/tracing/cli.py` — viewer: `--service`, `--last 30m/2h/7d`, `--limit`, `--by-span` (span-дерево последнего trace'а под фильтрами), `--trace <id>`. Запуск через `scripts/view_traces.py` (см. ниже).
+- `scripts/simple_pipeline.py` — минимальный pipeline (HTTP + compute + lookup, без LLM, без API-ключей) для smoke-теста трейсера и второй pipeline с интеграцией — `scripts/openlit_pipeline.py`.
+- `scripts/view_traces.py` — wrapper для CLI viewer'а: добавляет `src/` в `sys.path` (по аналогии с `*_pipeline.py`); избавляет от необходимости выставлять `PYTHONPATH=src` для `python -m tracing`.
+- `tests/test_tracing/test_store.py`, `test_exporter.py`, `test_smoke.py` — unit + smoke (subprocess-запуск `simple_pipeline.py` + проверка `traces.db`).
+- Pricing-patch перенесён из `openlit_pipeline.py` в `src/tracing/pricing.py::install_openlit_pricing()`.
+
+### Changed
+
+- `scripts/openlit_pipeline.py` — блок init (50+ строк ручного OpenLIT setup, pricing patch, OTEL provider, ConsoleSpanProcessor) свёрнут в 4 строки: `init_tracing(service_name=..., db_path=...)` + `tracer = get_tracer(...)`. В `__main__` добавлен `finish_tracing()` для гарантированного flush BSP. JSON-дамп `RESULT` убран из `__main__` (результат остаётся в БД, в `raw_spans_json` events Pydantic-модели).
+- `README.md` — добавлена секция «Tracing» с примерами; tools-table обновлён: убран `logfire_pipeline.py`, добавлены `simple_pipeline.py` и `view_traces.py`.
+
+### Fixed
+
+- **Stdout-summary не совпадал с `traces.db`** — ранее `SqliteSpanExporter.export()` печатал `[tracing] one-liner` сразу при получении первой порции span'ов от BatchSpanProcessor. Для долгих LLM-pipeline'ов первая порция приходила до того, как chat-span с `gen_ai.usage.cost` закрывался, и stdout показывал `cost=$0.00000 status=UNSET` тогда как в БД (через UPSERT) уже лежали `$0.00066 status=OK`. Exporter помечал trace_id в `_printed` и больше не печатал. **Решение:** stdout-summary перенесён из exporter'а (BSP-thread) в `finish_tracing()` (main thread, после `force_flush()`) — теперь читает финальные данные из БД и stdout гарантированно совпадает с ней.
+- **OpenLIT ConsoleExporter спам в stdout** — без `OTEL_EXPORTER_OTLP_ENDPOINT` `openlit.init()` сам ставит `ConsoleSpanExporter` (см. `openlit/otel/tracing.py:120-131`) и `ConsoleMetricReader`, которые выгружают в stdout полный JSON всех span'ов и метрик. **Решение:** в `init_tracing()` перед `openlit.init()` выставляются `OTEL_TRACES_EXPORTER=none`, `OTEL_METRICS_EXPORTER=none`, `OTEL_LOGS_EXPORTER=none` (стандартный механизм OTel SDK, OpenLIT его уважает). `setdefault` — пользовательский `otlp` для Phoenix-сценария не перетирается.
+
+### Removed
+
+- `scripts/logfire_pipeline.py` — отказались от Logfire как от эксперимента (cloud-first, нет локального persistent-режима, для OpenRouter cost нужно городить ручной `annotate_cost`).
+- `logfire` из `requirements.txt`.
+
 ## [0.3.0] - 2026-06-30
 
 ### Added

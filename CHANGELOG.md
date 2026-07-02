@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `src/crawler/` — новый MVP crawler-слой: `models.py` с `CrawlConfig` / `CrawledPage` / `RunStats` / `RunManifest` / `CrawlRunResult`, `url_utils.py` с canonicalization и same-domain filtering, `client.py` с ленивым импортом `crawl4ai`, `storage.py` с записью markdown + YAML front matter + `manifest.json`, `services.py` с BFS orchestration.
+- `scripts/crawl_site_to_markdown.py` — CLI-скрипт для обхода сайта по `--url`, `--max-pages`, `--output-dir`, `--delay` и вывода краткого summary по прогону.
+- `docs/crawler_tasks.md` — отмечен прогресс по фазам реализации crawler MVP и добавлена пометка про ручной интеграционный прогон после установки `crawl4ai`.
+
+### Changed
+
+- `README.md` — в таблицу tools добавлен crawler CLI и краткое описание output-структуры `output/<domain>/<timestamp>/`.
+- crawler CLI и service — добавлена случайная пауза между запросами `2-5` секунд по умолчанию и override через `--delay 10-20`.
+
 ## [0.4.0] - 2026-07-01
 
 ### Added

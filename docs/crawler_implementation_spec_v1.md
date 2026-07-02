@@ -107,6 +107,7 @@ scripts/
   - `max_pages: int`
   - `output_dir: Path`
   - `same_domain_only: bool = True`
+  - `delay_range_seconds: tuple[float, float] = (2.0, 5.0)`
 
 - `CrawledPage`
   - `url: str`
@@ -159,11 +160,11 @@ scripts/
 Допустимый минимум дополнительных флагов:
 
 - `same_domain_only`
+- `delay_range_seconds` (default `2-5` seconds between requests)
 
 Пока не добавляем без подтвержденной необходимости:
 
 - `concurrency`
-- `delay`
 - `respect_robots`
 - `exclude_patterns`
 - `follow_redirects`
@@ -211,7 +212,8 @@ Service должен хранить:
 
 - `visited` для уже обработанных нормализованных URL;
 - FIFO-очередь URL для `BFS`;
-- связь `discovered_from`, чтобы отражать источник обнаружения страницы в manifest.
+- связь `discovered_from`, чтобы отражать источник обнаружения страницы в manifest;
+- random delay между запросами (default `2-5` seconds, override через CLI `--delay`).
 
 ---
 
@@ -380,7 +382,7 @@ ruff check . --fix
 Пример команды для пользователя:
 
 ```powershell
-python scripts\crawl_site_to_markdown.py --url https://example.com --max-pages 10 --output-dir output
+python scripts\crawl_site_to_markdown.py --url https://example.com --max-pages 10 --delay 10-20 --output-dir output
 ```
 
 ---

@@ -11,82 +11,83 @@
 
 ## Foundation
 
-- [ ] Создать пакет `src/crawler/`
-- [ ] Добавить `src/crawler/__init__.py`
-- [ ] Создать `src/crawler/models.py`
-- [ ] Добавить `CrawlConfig`
-- [ ] Добавить `CrawledPage`
-- [ ] Добавить `RunStats`
-- [ ] Добавить `RunManifest`
-- [ ] Добавить `CrawlRunResult`
-- [ ] Создать `src/crawler/url_utils.py`
-- [ ] Реализовать `normalize_url()`
-- [ ] Реализовать same-domain filtering
-- [ ] Реализовать преобразование URL в путь внутри `pages/`
+- [x] Создать пакет `src/crawler/`
+- [x] Добавить `src/crawler/__init__.py`
+- [x] Создать `src/crawler/models.py`
+- [x] Добавить `CrawlConfig`
+- [x] Добавить `CrawledPage`
+- [x] Добавить `RunStats`
+- [x] Добавить `RunManifest`
+- [x] Добавить `CrawlRunResult`
+- [x] Создать `src/crawler/url_utils.py`
+- [x] Реализовать `normalize_url()`
+- [x] Реализовать same-domain filtering
+- [x] Реализовать преобразование URL в путь внутри `pages/`
 
 ---
 
 ## Crawl Client
 
-- [ ] Создать `src/crawler/client.py`
-- [ ] Добавить `Crawl4AiClient`
-- [ ] Изолировать импорт `crawl4ai` внутри `client.py`
-- [ ] Реализовать crawl одной страницы
-- [ ] Извлекать `title`
-- [ ] Извлекать `markdown`
-- [ ] Извлекать ссылки для дальнейшего обхода
-- [ ] Добавить структурированную обработку ошибок client-слоя
+- [x] Создать `src/crawler/client.py`
+- [x] Добавить `Crawl4AiClient`
+- [x] Изолировать импорт `crawl4ai` внутри `client.py`
+- [x] Реализовать crawl одной страницы
+- [x] Извлекать `title`
+- [x] Извлекать `markdown`
+- [x] Извлекать ссылки для дальнейшего обхода
+- [x] Добавить структурированную обработку ошибок client-слоя
 
 ---
 
 ## Storage
 
-- [ ] Создать `src/crawler/storage.py`
-- [ ] Добавить `MarkdownStorage`
-- [ ] Реализовать создание каталога прогона
-- [ ] Реализовать структуру `output/<domain>/<timestamp>/pages/`
-- [ ] Реализовать запись markdown-файлов
-- [ ] Добавить YAML front matter
-- [ ] Реализовать запись `manifest.json`
-- [ ] Возвращать `storage_path`
-- [ ] Возвращать относительные пути сохраненных страниц
+- [x] Создать `src/crawler/storage.py`
+- [x] Добавить `MarkdownStorage`
+- [x] Реализовать создание каталога прогона
+- [x] Реализовать структуру `output/<domain>/<timestamp>/pages/`
+- [x] Реализовать запись markdown-файлов
+- [x] Добавить YAML front matter
+- [x] Реализовать запись `manifest.json`
+- [x] Возвращать `storage_path`
+- [x] Возвращать относительные пути сохраненных страниц
 
 ---
 
 ## Service
 
-- [ ] Создать `src/crawler/services.py`
-- [ ] Добавить `SiteMarkdownCrawlerService`
-- [ ] Реализовать FIFO queue для BFS
-- [ ] Реализовать `visited`
-- [ ] Реализовать `discovered_from`
-- [ ] Применять canonicalization до постановки URL в очередь
-- [ ] Исключать дубли URL
-- [ ] Исключать внешние URL при `same_domain_only=True`
-- [ ] Ограничивать обход через `max_pages`
-- [ ] Собирать `RunStats`
-- [ ] Собирать `RunManifest`
-- [ ] Возвращать `CrawlRunResult`
+- [x] Создать `src/crawler/services.py`
+- [x] Добавить `SiteMarkdownCrawlerService`
+- [x] Реализовать FIFO queue для BFS
+- [x] Реализовать `visited`
+- [x] Реализовать `discovered_from`
+- [x] Применять canonicalization до постановки URL в очередь
+- [x] Исключать дубли URL
+- [x] Исключать внешние URL при `same_domain_only=True`
+- [x] Ограничивать обход через `max_pages`
+- [x] Собирать `RunStats`
+- [x] Собирать `RunManifest`
+- [x] Возвращать `CrawlRunResult`
 
 ---
 
 ## CLI
 
-- [ ] Создать `scripts/crawl_site_to_markdown.py`
-- [ ] Добавить аргумент `--url`
-- [ ] Добавить аргумент `--max-pages`
-- [ ] Добавить аргумент `--output-dir`
-- [ ] Создавать `CrawlConfig` из CLI-аргументов
-- [ ] Вызывать `SiteMarkdownCrawlerService`
-- [ ] Печатать summary результата
-- [ ] Печатать путь к output
+- [x] Создать `scripts/crawl_site_to_markdown.py`
+- [x] Добавить аргумент `--url`
+- [x] Добавить аргумент `--max-pages`
+- [x] Добавить аргумент `--output-dir`
+- [x] Добавить аргумент `--delay`
+- [x] Создавать `CrawlConfig` из CLI-аргументов
+- [x] Вызывать `SiteMarkdownCrawlerService`
+- [x] Печатать summary результата
+- [x] Печатать путь к output
 
 ---
 
 # Final Validation
 
-- [ ] `ruff check .`
-- [ ] `ruff check . --fix`
+- [x] `ruff check .`
+- [x] `ruff check . --fix`
 - [ ] Все Phase Verification Checklist закрыты.
 - [ ] CLI успешно выполняет интеграционный прогон.
 - [ ] Структура output соответствует Spec.
@@ -101,8 +102,9 @@
 Команда для ручного интеграционного прогона после реализации:
 
 ```powershell
-python scripts\crawl_site_to_markdown.py --url https://example.com --max-pages 10 --output-dir output
+python scripts\crawl_site_to_markdown.py --url https://example.com --max-pages 10 --delay 10-20 --output-dir output
 ```
 
+По умолчанию crawler делает случайную паузу `2-5` секунд между запросами. Для override используйте `--delay 10-20` или фиксированное значение `--delay 3`.
 
-```
+Перед ручным прогоном требуется установить `crawl4ai` в активный `venv`, иначе CLI завершится ошибкой импорта.

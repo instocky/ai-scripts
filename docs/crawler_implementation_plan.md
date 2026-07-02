@@ -185,6 +185,7 @@ output/<domain>/<timestamp>/
 - [ ] BFS действительно используется.
 - [ ] URL не обходятся повторно.
 - [ ] max_pages соблюдается.
+- [ ] delay range применяется между запросами.
 - [ ] discovered_from сохраняется.
 - [ ] Stats считаются корректно.
 
@@ -199,6 +200,7 @@ output/<domain>/<timestamp>/
   - `--url`;
   - `--max-pages`;
   - `--output-dir`;
+  - `--delay`;
 - создать `CrawlConfig`;
 - вызвать service;
 - вывести короткий summary по результату прогона.

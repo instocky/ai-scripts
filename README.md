@@ -51,6 +51,7 @@ python scripts\<script_name>.py
 | 3   | `scripts/simple_pipeline.py` | [OpenLIT](https://github.com/openlit/openlit) + OTel → SQLite                                              | Минимальный pipeline (HTTP + compute + lookup) для smoke-теста трейсера. Без LLM, без API-ключей             | —                                              |
 | 4   | `scripts/openlit_pipeline.py` | [OpenLIT](https://github.com/openlit/openlit) + OTel → SQLite (+ OTLP escape hatch)                      | Сквозной pipeline через OpenTelemetry: HTTP → Pydantic → lookup → LLM ×2. Трейсы — в SQLite                  | [docs/openlit_pipeline.md](docs/openlit_pipeline.md) |
 | 5   | `scripts/view_traces.py`    | CLI viewer для `src/tracing/`                                                                              | `python scripts\view_traces.py --last 24h --limit 20` — таблица trace'ов; `--by-span` — дерево span'ов        | —                                              |
+| 6   | `scripts/crawl_site_to_markdown.py` | `crawl4ai` + service layer + markdown storage                                                      | BFS-обход одного домена, сохранение страниц в `.md` с YAML front matter и итоговым `manifest.json`             | [docs/crawler_tasks.md](docs/crawler_tasks.md) |
 
 ---
 
@@ -95,6 +96,25 @@ python scripts\view_traces.py --trace f90823cc...   # конкретный trace
 ## Planned
 
 См. [BACKLOG.md](BACKLOG.md) — что планируется добавить следующим.
+
+---
+
+## Crawler
+
+MVP crawler запускается так:
+
+```powershell
+python scripts\crawl_site_to_markdown.py --url https://example.com --max-pages 10 --delay 10-20 --output-dir output
+```
+
+Скрипт использует `src/crawler/` и пишет результат в `output/<domain>/<timestamp>/`:
+
+- `manifest.json`
+- `pages/**/*.md`
+
+По умолчанию crawler делает случайную паузу `2-5` секунд между запросами. Override: `--delay 10-20` или фиксированное значение `--delay 3`.
+
+Для реального запуска в текущем `venv` должен быть установлен `crawl4ai`.
 
 ---
 

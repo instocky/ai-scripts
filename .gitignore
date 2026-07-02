@@ -47,6 +47,9 @@ report*.md
 settings*.json
 *.db
 graceful-matter-298207-a61df8962a19.json
+output/*
+!output/example.com/
+!output/example.com/**
 
 # Ingestion smoke-test outputs (step1)
 out/
